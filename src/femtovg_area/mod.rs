@@ -188,6 +188,9 @@ impl FemtoVGArea {
     }
 
     pub fn set_zoom_scale(&self, factor: f32) {
+        if self.is_layout_pinned() {
+            return;
+        }
         self.imp()
             .inner()
             .as_mut()
@@ -214,6 +217,9 @@ impl FemtoVGArea {
     }
 
     pub fn set_drag_offset(&self, offset: Vec2D) {
+        if self.is_layout_pinned() {
+            return;
+        }
         self.imp()
             .inner()
             .as_mut()
@@ -240,6 +246,9 @@ impl FemtoVGArea {
     }
 
     pub fn reset_size(&self, factor: f32) {
+        if self.is_layout_pinned() {
+            return;
+        }
         self.imp()
             .inner()
             .as_mut()
@@ -328,6 +337,14 @@ impl FemtoVGArea {
             .as_mut()
             .expect("Did you call init before using FemtoVgArea?")
             .set_hidden_drawable_index(index);
+    }
+
+    /// True while this area shows a fixed slice, which makes zoom and pan meaningless.
+    fn is_layout_pinned(&self) -> bool {
+        self.imp()
+            .inner()
+            .as_ref()
+            .is_some_and(|inner| inner.has_layout_view())
     }
 
     /// Pins this area to a fixed image slice at native scale; `None` restores fit/center.

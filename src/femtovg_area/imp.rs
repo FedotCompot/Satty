@@ -863,6 +863,10 @@ impl FemtoVgAreaMut {
         self.layout_view = view;
     }
 
+    pub fn has_layout_view(&self) -> bool {
+        self.layout_view.is_some()
+    }
+
     pub fn update_transformation(
         &mut self,
         canvas: &mut femtovg::Canvas<femtovg::renderer::OpenGl>,
