@@ -25,7 +25,8 @@ pub struct Blur {
     style: Style,
     centered: bool,
     editing: bool,
-    cached_image: RefCell<Option<ImageId>>,
+    // (blurred image, and the image-space rect it was actually sampled from)
+    cached_image: RefCell<Option<(ImageId, Vec2D, Vec2D)>>,
 }
 
 impl Blur {
@@ -36,25 +37,52 @@ impl Blur {
         self.size = drag_box.size;
     }
 
+    /// Returns `Ok(None)` when the rect does not overlap what this render target shows, which is
+    /// the case for a blur belonging to another monitor in fullscreen="all". Otherwise it returns
+    /// the blurred image and the image-space rect it was sampled from, which is clipped to the
+    /// target and so can be smaller than the requested rect.
     fn blur(
         canvas: &mut femtovg::Canvas<femtovg::renderer::OpenGl>,
         pos: Vec2D,
         size: Vec2D,
         sigma: f32,
-    ) -> Result<ImageId> {
+    ) -> Result<Option<(ImageId, Vec2D, Vec2D)>> {
+        let transform = canvas.transform();
+        let scale = transform.average_scale().max(f32::EPSILON);
+        let transformed_pos = transform.transform_point(pos.x, pos.y);
+        let transformed_size = size * scale;
+
+        // the queued render target only takes effect on flush, and screenshot() reads the bound
+        // one: without this an export wider than the screen drops every blur past the screen edge
+        canvas.flush();
+
+        // clamp each edge independently; a forced minimum would break the `left + width <=
+        // width()` bound that sub_image asserts on for a rect past the right or bottom edge
+        let clamp = |v: f32, max: usize| (v.max(0.0) as usize).min(max);
+        let target_w = canvas.width() as usize;
+        let target_h = canvas.height() as usize;
+        let left = clamp(transformed_pos.0, target_w);
+        let top = clamp(transformed_pos.1, target_h);
+        let right = clamp(transformed_pos.0 + transformed_size.x, target_w);
+        let bottom = clamp(transformed_pos.1 + transformed_size.y, target_h);
+
+        // bail before the expensive read-back when there is nothing to sample
+        if right <= left || bottom <= top {
+            return Ok(None);
+        }
+
         let img = canvas.screenshot()?;
 
-        let transformed_pos = canvas.transform().transform_point(pos.x, pos.y);
-        let transformed_size = size * canvas.transform().average_scale();
+        // re-clamp: sub_image asserts against the screenshot, which need not match the canvas view
+        let left = left.min(img.width());
+        let top = top.min(img.height());
+        let width = right.min(img.width()).saturating_sub(left);
+        let height = bottom.min(img.height()).saturating_sub(top);
+        if width == 0 || height == 0 {
+            return Ok(None);
+        }
 
-        let (buf, width, height) = img
-            .sub_image(
-                transformed_pos.0 as usize,
-                transformed_pos.1 as usize,
-                (transformed_size.x as usize).max(1),
-                (transformed_size.y as usize).max(1),
-            )
-            .to_contiguous_buf();
+        let (buf, width, height) = img.sub_image(left, top, width, height).to_contiguous_buf();
         let sub = Img::new(buf.into_owned(), width, height);
 
         let src_image_id = canvas.create_image(sub.as_ref(), ImageFlags::empty())?;
@@ -72,7 +100,14 @@ impl Blur {
         );
         //canvas.delete_image(src_image_id);
 
-        Ok(dst_image_id)
+        // map the sampled device rect back to image space so draw paints it 1:1 instead of
+        // stretching a clipped sample across the whole rect
+        let origin = transform.transform_point(0.0, 0.0);
+        let to_image = |x: f32, y: f32| Vec2D::new((x - origin.0) / scale, (y - origin.1) / scale);
+        let paint_pos = to_image(left as f32, top as f32);
+        let paint_end = to_image((left + width) as f32, (top + height) as f32);
+
+        Ok(Some((dst_image_id, paint_pos, paint_end - paint_pos)))
     }
 }
 
@@ -146,33 +181,38 @@ impl Drawable for Blur {
                 return Ok(());
             }
 
-            // create new cached image
+            // left uncached when invisible here, so the full-image export recomputes it
             if self.cached_image.borrow().is_none() {
-                self.cached_image.borrow_mut().replace(Self::blur(
+                let blurred = Self::blur(
                     canvas,
                     pos,
                     size,
                     self.style
                         .size
                         .to_blur_factor(self.style.annotation_size_factor),
-                )?);
+                )?;
+                if let Some(entry) = blurred {
+                    self.cached_image.borrow_mut().replace(entry);
+                }
             }
 
-            let mut path = Path::new();
-            path.rounded_rect(pos.x, pos.y, size.x, size.y, self.style.corner_radius());
+            if let Some((image_id, paint_pos, paint_size)) = *self.cached_image.borrow() {
+                let mut path = Path::new();
+                path.rounded_rect(pos.x, pos.y, size.x, size.y, self.style.corner_radius());
 
-            canvas.fill_path(
-                &path,
-                &Paint::image(
-                    self.cached_image.borrow().unwrap(), // this unwrap is safe because we placed it above
-                    pos.x,
-                    pos.y,
-                    size.x,
-                    size.y,
-                    0f32,
-                    1f32,
-                ),
-            );
+                canvas.fill_path(
+                    &path,
+                    &Paint::image(
+                        image_id,
+                        paint_pos.x,
+                        paint_pos.y,
+                        paint_size.x,
+                        paint_size.y,
+                        0f32,
+                        1f32,
+                    ),
+                );
+            }
         }
 
         if self.editing && self.centered {
