@@ -1420,8 +1420,8 @@ impl SketchBoard {
             if me.type_ == MouseEventType::Click && me.n_pressed == 2 {
                 self.handle_pointer_tool_double_click(me.pos, sender)
                     .unwrap_or_else(|| ToolUpdateResult::Unmodified)
-            } else if me.type_ == MouseEventType::Click
-                && me.n_pressed == 1
+            } else if (me.type_ == MouseEventType::BeginDrag
+                || (me.type_ == MouseEventType::Click && me.n_pressed == 1))
                 && let Some(previous_tool) = self.temporary_pointer_previous_tool
                 && previous_tool != Tools::Pointer
                 && self.hit_test_annotations(me.pos).is_empty()
@@ -2384,6 +2384,9 @@ impl Component for SketchBoard {
                     self.refresh_screen();
                     return;
                 };
+                // there is only ever one crop, and the next action on a fresh one is nearly
+                // always to adjust it, so it is selected regardless of auto-select-new
+                let is_crop = drawable.get_rendering_mode() == RenderingMode::Crop;
                 self.renderer.commit(drawable);
                 // Queue this after any live drag update so the final display is authoritative.
                 sender_clone.input(SketchBoardInput::ShapeDimensionsUpdate(
@@ -2393,7 +2396,7 @@ impl Component for SketchBoard {
 
                 let committed_index = self.renderer.last_drawable_index();
 
-                if auto_select {
+                if auto_select || is_crop {
                     if let Some(index) = committed_index
                         && let Some(new_bounds) = self.renderer.get_drawable_bounds(index)
                     {
