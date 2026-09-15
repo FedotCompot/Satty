@@ -9,7 +9,6 @@ use relm4::gtk::gdk::{Key, ModifierType};
 
 use crate::configuration::{APP_CONFIG, Action};
 use crate::sketch_board::KeyEventMsg;
-use crate::style::Size;
 use crate::tools::Tools;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -42,8 +41,6 @@ pub enum ShortcutCommand {
 
     // bottom toolbar
     SelectColorIndex(u64),
-    CycleSize,
-    SelectSize(Size),
     FocusAnnotationSizeFactor,
     ToggleFill,
     ToggleRoundCaps,
@@ -93,12 +90,6 @@ impl fmt::Display for ShortcutCommand {
                 write!(f, "select-color-index:{}", index + 1)?;
                 return Ok(());
             }
-            ShortcutCommand::CycleSize => "cycle-size",
-            ShortcutCommand::SelectSize(size) => match size {
-                Size::Small => "select-size:small",
-                Size::Medium => "select-size:medium",
-                Size::Large => "select-size:large",
-            },
             ShortcutCommand::FocusAnnotationSizeFactor => "focus-annotation-size-factor",
             ShortcutCommand::ToggleFill => "toggle-fill",
             ShortcutCommand::ToggleRoundCaps => "toggle-round-caps",
@@ -167,10 +158,6 @@ impl FromStr for ShortcutCommand {
                 }
                 Err(ParseCommandError)
             }
-            "cycle-size" => Ok(ShortcutCommand::CycleSize),
-            "select-size:small" => Ok(ShortcutCommand::SelectSize(Size::Small)),
-            "select-size:medium" => Ok(ShortcutCommand::SelectSize(Size::Medium)),
-            "select-size:large" => Ok(ShortcutCommand::SelectSize(Size::Large)),
             "focus-annotation-size-factor" => Ok(ShortcutCommand::FocusAnnotationSizeFactor),
             "toggle-fill" => Ok(ShortcutCommand::ToggleFill),
             "toggle-round-caps" => Ok(ShortcutCommand::ToggleRoundCaps),
@@ -295,7 +282,6 @@ impl ShortcutRegistry {
             registry.add_key_binding(&key, SC::SelectColorIndex(i - 1));
         }
 
-        registry.add_key_binding("minus", SC::CycleSize);
         registry.add_key_binding("s", SC::FocusAnnotationSizeFactor);
         registry.add_key_binding("f", SC::ToggleFill);
 

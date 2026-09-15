@@ -89,11 +89,7 @@ impl Highlight for Highlighter<FreehandHighlight> {
             self.style.color.b,
             (255.0 * HIGHLIGHT_OPACITY) as u8,
         ));
-        paint.set_line_width(
-            self.style
-                .size
-                .to_highlight_width(self.style.annotation_size_factor),
-        );
+        paint.set_line_width(self.style.highlight_width());
         paint.set_line_join(femtovg::LineJoin::Round);
         paint.set_line_cap(femtovg::LineCap::Square);
 
@@ -171,10 +167,7 @@ impl Drawable for HighlightKind {
                     max_x = max_x.max(abs.x);
                     max_y = max_y.max(abs.y);
                 }
-                let stroke_width = h
-                    .style
-                    .size
-                    .to_highlight_width(h.style.annotation_size_factor);
+                let stroke_width = h.style.highlight_width();
                 Some((
                     Vec2D::new(min_x, min_y) - stroke_width,
                     Vec2D::new(max_x, max_y) + stroke_width,

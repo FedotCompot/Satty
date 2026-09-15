@@ -69,10 +69,7 @@ impl Pixelate {
         pos: Vec2D,
         size: Vec2D,
     ) -> Result<Option<(ImageId, Vec2D, Vec2D)>> {
-        let blocksize = self
-            .style
-            .size
-            .to_blocksize(self.style.annotation_size_factor);
+        let blocksize = self.style.blocksize();
         // for testing
         // let blocksize = self.style.annotation_size_factor.max(2.0) as usize;
 

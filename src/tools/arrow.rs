@@ -217,9 +217,7 @@ impl Drawable for Arrow {
         let round_caps = self.style.round_caps;
 
         let line_width = if round_caps || !self.style.fill {
-            self.style
-                .size
-                .to_line_width(self.style.annotation_size_factor)
+            self.style.line_width()
         } else {
             0.0
         };
@@ -236,18 +234,10 @@ impl Drawable for Arrow {
         canvas.rotate(arrow_direction.angle().radians);
 
         // The width of the tail (double distance from start to head side)
-        let tail_width = self
-            .style
-            .size
-            .to_arrow_tail_width(self.style.annotation_size_factor)
-            - line_width;
+        let tail_width = self.style.arrow_tail_width() - line_width;
 
         // The length of the (sloped) side of the arrow head (distance from end to head side).
-        let head_side_length = self
-            .style
-            .size
-            .to_arrow_head_length(self.style.annotation_size_factor)
-            - line_width;
+        let head_side_length = self.style.arrow_head_length() - line_width;
 
         // The offset of the midpoint is the distance the midpoint moves toward the end of the arrow.
         // A offset of 0 will place the midpoint right below the head side.

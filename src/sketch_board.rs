@@ -27,7 +27,7 @@ use crate::ime::pango_adapter::spans_from_pango_attrs;
 use crate::keybindings::{ActionTrigger, ShortcutCommand, ShortcutRegistry};
 use crate::math::{Vec2D, crop_rect_in_bounds};
 use crate::notification::{log_result, log_result_with_pixbuf};
-use crate::style::{Color, Size, Style};
+use crate::style::{Color, Style};
 use crate::tools::{
     Drawable, ImagePlacement, PointerTool, RenderingMode, TextTool, Tool, ToolEvent,
     ToolUpdateResult, Tools, ToolsManager,
@@ -71,7 +71,6 @@ pub enum SketchBoardOutput {
     ToolSwitchShortcut(Tools),
     ColorSwitchShortcut(u64),
     SetColor(Color),
-    SetSize(Size),
     SetAnnotationSizeFactor(f32),
     FocusAnnotationSizeFactorShortcut,
     SetFill(bool),
@@ -553,11 +552,6 @@ impl SketchBoard {
             sender
                 .output_sender()
                 .emit(SketchBoardOutput::SetColor(style.color));
-        }
-        if old_style.size != style.size {
-            sender
-                .output_sender()
-                .emit(SketchBoardOutput::SetSize(style.size));
         }
         if old_style.annotation_size_factor != style.annotation_size_factor {
             sender
@@ -1642,13 +1636,6 @@ impl SketchBoard {
                 self.style.color = color;
                 self.set_drawable_style_from_toolbar_style()
             }
-            ToolbarEvent::SizeSelected(size) => {
-                self.style.size = size;
-                sender
-                    .output_sender()
-                    .emit(SketchBoardOutput::SetSize(size));
-                self.set_drawable_style_from_toolbar_style()
-            }
             ToolbarEvent::SaveFile => self.handle_action(&[Action::SaveToFile]),
             ToolbarEvent::CopyClipboard => self.handle_action(&[Action::SaveToClipboard]),
             ToolbarEvent::Undo => self.handle_undo(),
@@ -1807,23 +1794,6 @@ impl SketchBoard {
                 sender
                     .output_sender()
                     .emit(SketchBoardOutput::ColorSwitchShortcut(index));
-                ToolUpdateResult::Unmodified
-            }
-            ShortcutCommand::SelectSize(size) => {
-                sender.input(SketchBoardInput::ToolbarEvent(ToolbarEvent::SizeSelected(
-                    size,
-                )));
-                ToolUpdateResult::Unmodified
-            }
-            ShortcutCommand::CycleSize => {
-                self.style.size = match self.style.size {
-                    Size::Small => Size::Large,
-                    Size::Medium => Size::Small,
-                    Size::Large => Size::Medium,
-                };
-                sender.input(SketchBoardInput::ToolbarEvent(ToolbarEvent::SizeSelected(
-                    self.style.size,
-                )));
                 ToolUpdateResult::Unmodified
             }
             ShortcutCommand::FocusAnnotationSizeFactor => {

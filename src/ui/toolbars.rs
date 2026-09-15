@@ -4,7 +4,7 @@ use crate::{
     configuration::{APP_CONFIG, Action},
     keybindings::{ShortcutCommand, ShortcutRegistry},
     math::{Vec2D, get_closest_aspect_ratio},
-    style::{Color, Size},
+    style::Color,
     tools::Tools,
 };
 
@@ -34,7 +34,6 @@ pub struct StyleToolbar {
     custom_color: Color,
     custom_color_pixbuf: Pixbuf,
     color_action: SimpleAction,
-    size_action: SimpleAction,
     size_spin_button: gtk::SpinButton,
     fill_enabled: bool,
     round_caps_enabled: bool,
@@ -50,7 +49,6 @@ pub enum ToolbarEvent {
     ToolSelected(Tools),
     ColorSelected(Color),
     SetFill(bool),
-    SizeSelected(Size),
     AnnotationSizeFactorChanged(f32),
     Redo,
     Undo,
@@ -78,7 +76,6 @@ pub enum StyleToolbarInput {
     SetColor(Color),
     SetFill(bool),
     SetRoundCaps(bool),
-    SetSize(Size),
     SetAnnotationSizeFactor(f32),
     ResetAnnotationSizeFactor,
     ShowColorDialog,
@@ -598,33 +595,6 @@ impl Component for StyleToolbar {
                 connect_clicked => StyleToolbarInput::ShowColorDialog,
             },
             gtk::Separator {},
-            #[name(size_small_button)]
-            gtk::ToggleButton {
-                set_focusable: false,
-                set_hexpand: false,
-
-                set_label: "S",
-                set_tooltip: "Small size",
-                ActionablePlus::set_action::<SizeAction>: Size::Small,
-            },
-            #[name(size_medium_button)]
-            gtk::ToggleButton {
-                set_focusable: false,
-                set_hexpand: false,
-
-                set_label: "M",
-                set_tooltip: "Medium size",
-                ActionablePlus::set_action::<SizeAction>: Size::Medium,
-            },
-            #[name(size_large_button)]
-            gtk::ToggleButton {
-                set_focusable: false,
-                set_hexpand: false,
-
-                set_label: "L",
-                set_tooltip: "Large size",
-                ActionablePlus::set_action::<SizeAction>: Size::Large,
-            },
             gtk::Label {
                 set_focusable: false,
                 set_hexpand: false,
@@ -791,9 +761,6 @@ impl Component for StyleToolbar {
             StyleToolbarInput::SetRoundCaps(round_caps_enabled) => {
                 self.round_caps_enabled = round_caps_enabled;
             }
-            StyleToolbarInput::SetSize(size) => {
-                self.size_action.change_state(&size.to_variant());
-            }
             StyleToolbarInput::SetAnnotationSizeFactor(value) => {
                 self.size_spin_button.set_value(value as f64);
             }
@@ -879,16 +846,6 @@ impl Component for StyleToolbar {
             },
         );
 
-        // Size Action for selecting sizes
-        let sender_tmp = sender.clone();
-        let size_action: RelmAction<SizeAction> =
-            RelmAction::new_stateful_with_target_value(&Size::Medium, move |_, state, value| {
-                *state = value;
-                sender_tmp
-                    .output_sender()
-                    .emit(ToolbarEvent::SizeSelected(*state));
-            });
-
         let custom_color = APP_CONFIG
             .read()
             .color_palette()
@@ -903,7 +860,6 @@ impl Component for StyleToolbar {
             custom_color,
             custom_color_pixbuf,
             color_action: SimpleAction::from(color_action.clone()),
-            size_action: SimpleAction::from(size_action.clone()),
             size_spin_button: gtk::SpinButton::new(None::<&gtk::Adjustment>, 0.1, 2),
             fill_enabled: APP_CONFIG.read().default_fill_shapes(),
             round_caps_enabled: APP_CONFIG.read().default_round_caps(),
@@ -917,21 +873,6 @@ impl Component for StyleToolbar {
         let widgets = view_output!();
         model.size_spin_button = widgets.size_spin_button.clone();
 
-        update_hint(
-            &shortcut_registry,
-            &widgets.size_small_button,
-            ShortcutCommand::SelectSize(Size::Small),
-        );
-        update_hint(
-            &shortcut_registry,
-            &widgets.size_medium_button,
-            ShortcutCommand::SelectSize(Size::Medium),
-        );
-        update_hint(
-            &shortcut_registry,
-            &widgets.size_large_button,
-            ShortcutCommand::SelectSize(Size::Large),
-        );
         update_hint(
             &shortcut_registry,
             &widgets.size_spin_button,
@@ -950,7 +891,6 @@ impl Component for StyleToolbar {
 
         let mut group = RelmActionGroup::<StyleToolbarActionGroup>::new();
         group.add_action(color_action);
-        group.add_action(size_action);
 
         group.register_for_widget(&widgets.root);
 
@@ -974,8 +914,6 @@ impl Clone for ColorAction {
         Self {}
     }
 }
-
-relm4::new_stateful_action!(SizeAction, StyleToolbarActionGroup, "sizes", Size, Size);
 
 impl StaticVariantType for ColorButtons {
     fn static_variant_type() -> Cow<'static, VariantTy> {

@@ -183,14 +183,7 @@ impl Drawable for Blur {
 
             // left uncached when invisible here, so the full-image export recomputes it
             if self.cached_image.borrow().is_none() {
-                let blurred = Self::blur(
-                    canvas,
-                    pos,
-                    size,
-                    self.style
-                        .size
-                        .to_blur_factor(self.style.annotation_size_factor),
-                )?;
+                let blurred = Self::blur(canvas, pos, size, self.style.blur_factor())?;
                 if let Some(entry) = blurred {
                     self.cached_image.borrow_mut().replace(entry);
                 }

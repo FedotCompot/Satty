@@ -14,7 +14,6 @@ use crate::configuration::APP_CONFIG;
 #[derive(Clone, Copy, Debug)]
 pub struct Style {
     pub color: Color,
-    pub size: Size,
     pub fill: bool,
     pub round_caps: bool,
     pub annotation_size_factor: f32,
@@ -28,19 +27,10 @@ pub struct Color {
     pub a: u8,
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Default)]
-pub enum Size {
-    Small = 0,
-    #[default]
-    Medium = 1,
-    Large = 2,
-}
-
 impl Default for Style {
     fn default() -> Self {
         Self {
             color: Color::default(),
-            size: Size::default(),
             fill: APP_CONFIG.read().default_fill_shapes(),
             round_caps: APP_CONFIG.read().default_round_caps(),
             annotation_size_factor: APP_CONFIG.read().annotation_size_factor(),
@@ -199,95 +189,44 @@ impl From<Style> for Paint {
     fn from(value: Style) -> Self {
         Paint::default()
             .with_anti_alias(true)
-            .with_font_size(value.size.to_text_size(value.annotation_size_factor) as f32)
+            .with_font_size(value.text_size() as f32)
             .with_color(value.color.into())
             .with_line_cap(if value.round_caps {
                 LineCap::Round
             } else {
                 LineCap::Butt
             })
-            .with_line_width(value.size.to_line_width(value.annotation_size_factor))
+            .with_line_width(value.line_width())
     }
 }
 
-impl StaticVariantType for Size {
-    fn static_variant_type() -> Cow<'static, VariantTy> {
-        Cow::Borrowed(VariantTy::UINT32)
-    }
-}
-
-impl ToVariant for Size {
-    fn to_variant(&self) -> Variant {
-        Variant::from(*self as u32)
-    }
-}
-
-impl FromVariant for Size {
-    fn from_variant(variant: &Variant) -> Option<Self> {
-        variant.get::<u32>().and_then(|v| match v {
-            0 => Some(Size::Small),
-            1 => Some(Size::Medium),
-            2 => Some(Size::Large),
-            _ => None,
-        })
-    }
-}
-
-impl Size {
-    pub fn to_text_size(self, size_factor: f32) -> i32 {
-        match self {
-            Size::Small => (36.0 * size_factor) as i32,
-            Size::Medium => (54.0 * size_factor) as i32,
-            Size::Large => (96.0 * size_factor) as i32,
-        }
+impl Style {
+    pub fn text_size(&self) -> i32 {
+        (54.0 * self.annotation_size_factor) as i32
     }
 
-    pub fn to_line_width(self, size_factor: f32) -> f32 {
-        match self {
-            Size::Small => 3.0 * size_factor,
-            Size::Medium => 5.0 * size_factor,
-            Size::Large => 7.0 * size_factor,
-        }
+    pub fn line_width(&self) -> f32 {
+        5.0 * self.annotation_size_factor
     }
 
-    pub fn to_arrow_tail_width(self, size_factor: f32) -> f32 {
-        match self {
-            Size::Small => 3.0 * size_factor,
-            Size::Medium => 10.0 * size_factor,
-            Size::Large => 25.0 * size_factor,
-        }
+    pub fn arrow_tail_width(&self) -> f32 {
+        10.0 * self.annotation_size_factor
     }
 
-    pub fn to_arrow_head_length(self, size_factor: f32) -> f32 {
-        match self {
-            Size::Small => 15.0 * size_factor,
-            Size::Medium => 30.0 * size_factor,
-            Size::Large => 60.0 * size_factor,
-        }
+    pub fn arrow_head_length(&self) -> f32 {
+        30.0 * self.annotation_size_factor
     }
 
-    pub fn to_blur_factor(self, size_factor: f32) -> f32 {
-        match self {
-            Size::Small => 10.0 * size_factor,
-            Size::Medium => 20.0 * size_factor,
-            Size::Large => 30.0 * size_factor,
-        }
+    pub fn blur_factor(&self) -> f32 {
+        20.0 * self.annotation_size_factor
     }
 
-    pub fn to_highlight_width(self, size_factor: f32) -> f32 {
-        match self {
-            Size::Small => 15.0 * size_factor,
-            Size::Medium => 30.0 * size_factor,
-            Size::Large => 45.0 * size_factor,
-        }
+    pub fn highlight_width(&self) -> f32 {
+        30.0 * self.annotation_size_factor
     }
 
-    pub fn to_blocksize(self, size_factor: f32) -> usize {
-        match self {
-            Size::Small => 4 * (size_factor as usize).max(1),
-            Size::Medium => 8 * (size_factor as usize).max(1),
-            Size::Large => 16 * (size_factor as usize).max(1),
-        }
+    pub fn blocksize(&self) -> usize {
+        ((8.0 * self.annotation_size_factor).round() as usize).max(2)
     }
 }
 

@@ -43,7 +43,7 @@ mod ui;
 
 use crate::math::Vec2D;
 use crate::sketch_board::{MonitorViewSpec, SketchBoard, SketchBoardInput, pixbuf_from_drop_value};
-use crate::style::{Color, Size};
+use crate::style::Color;
 use crate::tools::Tools;
 
 pub static START_TIME: LazyLock<chrono::DateTime<chrono::Local>> =
@@ -93,7 +93,6 @@ enum AppInput {
     ToolSwitchShortcut(Tools),
     ColorSwitchShortcut(u64),
     SetColor(Color),
-    SetSize(Size),
     SetAnnotationSizeFactor(f32),
     FocusAnnotationSizeFactorShortcut,
     ScaleFactorChanged,
@@ -326,11 +325,6 @@ impl Component for App {
                     .sender()
                     .emit(StyleToolbarInput::SetRoundCaps(round_caps_enabled));
             }
-            AppInput::SetSize(size) => {
-                self.style_toolbar
-                    .sender()
-                    .emit(StyleToolbarInput::SetSize(size));
-            }
             AppInput::SetAnnotationSizeFactor(factor) => {
                 self.style_toolbar
                     .sender()
@@ -419,7 +413,6 @@ impl Component for App {
                     SketchBoardOutput::SetRoundCaps(round_caps_enabled) => {
                         AppInput::SetRoundCaps(round_caps_enabled)
                     }
-                    SketchBoardOutput::SetSize(size) => AppInput::SetSize(size),
                     SketchBoardOutput::FocusAnnotationSizeFactorShortcut => {
                         AppInput::FocusAnnotationSizeFactorShortcut
                     }
