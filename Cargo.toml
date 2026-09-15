@@ -26,6 +26,9 @@ relm4 = { version = "0.10.1", features = ["macros", "libadwaita", "gnome_42"] }
 tokio = { version = "1.53.1", features = ["time"] }
 tempfile = "3.27"
 
+# wayland layer-shell: spans fullscreen="all" across all monitors
+gtk4-layer-shell = "0.7.0"
+
 # error handling
 anyhow = "1.0"
 thiserror = "2.0"

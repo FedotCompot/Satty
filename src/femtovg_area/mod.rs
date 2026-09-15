@@ -329,4 +329,19 @@ impl FemtoVGArea {
             .expect("Did you call init before using FemtoVgArea?")
             .set_hidden_drawable_index(index);
     }
+
+    /// Pins this area to a fixed image slice at native scale; `None` restores fit/center.
+    pub fn set_layout_view(&self, view: Option<(Vec2D, f32)>) {
+        self.prime_layout_view(view);
+        self.imp().resize(0, 0);
+    }
+
+    /// Sets the layout view without rendering; for use before the area is realized.
+    pub fn prime_layout_view(&self, view: Option<(Vec2D, f32)>) {
+        self.imp()
+            .inner()
+            .as_mut()
+            .expect("Did you call init before using FemtoVgArea?")
+            .set_layout_view(view);
+    }
 }

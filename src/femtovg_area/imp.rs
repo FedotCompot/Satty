@@ -63,6 +63,8 @@ pub struct FemtoVgAreaMut {
     is_drag: bool,
     is_reset: bool,
     hidden_drawable_index: Option<usize>,
+    // fixed image slice shown at native scale: (image_origin, image_px_per_device_px)
+    layout_view: Option<(Vec2D, f32)>,
 }
 
 enum HistoryEntry {
@@ -206,6 +208,7 @@ impl FemtoVGArea {
             is_drag: false,
             is_reset: false,
             hidden_drawable_index: None,
+            layout_view: None,
         });
         self.sender.borrow_mut().replace(sender);
     }
@@ -588,6 +591,11 @@ impl FemtoVgAreaMut {
         )?;
         canvas.set_render_target(femtovg::RenderTarget::Image(image_id));
 
+        // caches were filled from the on-screen target, which shows only this area's slice
+        for d in &mut self.drawables {
+            d.invalidate_gl_cache();
+        }
+
         // apply offset
         let mut transform = Transform2D::identity();
         transform.translate(-pos.x, -pos.y);
@@ -851,10 +859,21 @@ impl FemtoVgAreaMut {
         }
     }
 
+    pub fn set_layout_view(&mut self, view: Option<(Vec2D, f32)>) {
+        self.layout_view = view;
+    }
+
     pub fn update_transformation(
         &mut self,
         canvas: &mut femtovg::Canvas<femtovg::renderer::OpenGl>,
     ) {
+        // pinned per-monitor slice: native scale, no fit/center/zoom
+        if let Some((origin, image_per_device_px)) = self.layout_view {
+            self.scale_factor = 1.0 / image_per_device_px;
+            self.offset = Vec2D::new(-origin.x * self.scale_factor, -origin.y * self.scale_factor);
+            return;
+        }
+
         let image_width = self.background_image.width() as f32;
         let image_height = self.background_image.height() as f32;
         let aspect_ratio = image_width / image_height;

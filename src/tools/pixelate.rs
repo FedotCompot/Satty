@@ -283,6 +283,10 @@ impl Drawable for Pixelate {
         hit_test_rectangle(pos, self.top_left, self.size, tolerance, true)
     }
 
+    fn invalidate_gl_cache(&mut self) {
+        *self.cached_image.borrow_mut() = None;
+    }
+
     fn translate(&mut self, delta: Vec2D) {
         self.top_left += delta;
         // invalidate cached blur image since position changed

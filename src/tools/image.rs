@@ -164,6 +164,10 @@ impl Drawable for Image {
         self.size = br - tl;
     }
 
+    fn invalidate_gl_cache(&mut self) {
+        self.cached_image_id.set(None);
+    }
+
     fn draw(
         &self,
         canvas: &mut femtovg::Canvas<femtovg::renderer::OpenGl>,

@@ -219,6 +219,8 @@ pub trait Drawable: DrawableClone + Debug + AsAny {
     }
     fn handle_undo(&mut self) {}
     fn handle_redo(&mut self) {}
+    /// Drops GL resource ids, which are only valid in the context they were created in.
+    fn invalidate_gl_cache(&mut self) {}
     fn get_rendering_mode(&self) -> RenderingMode {
         RenderingMode::Default
     }

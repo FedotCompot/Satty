@@ -491,7 +491,10 @@ impl PointerTool {
         self.selected_index = Some(index);
         self.selected_bounds = Some(orig_bounds);
         self.selection_overlay = None;
-        self.preview = Some(drawable.clone_box());
+        // every area renders this preview, so it must not carry the primary's GL resource ids
+        let mut preview = drawable.clone_box();
+        preview.invalidate_gl_cache();
+        self.preview = Some(preview);
         self.drag_state = DragState::Moving {
             index,
             original: drawable,
@@ -513,7 +516,10 @@ impl PointerTool {
         self.selected_index = Some(index);
         self.selected_bounds = Some(orig_bounds);
         self.selection_overlay = None;
-        self.preview = Some(drawable.clone_box());
+        // every area renders this preview, so it must not carry the primary's GL resource ids
+        let mut preview = drawable.clone_box();
+        preview.invalidate_gl_cache();
+        self.preview = Some(preview);
         self.drag_state = DragState::Resizing {
             index,
             original: drawable,
