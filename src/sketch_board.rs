@@ -1336,6 +1336,58 @@ impl SketchBoard {
         }
     }
 
+    fn crop_index(&self) -> Option<usize> {
+        self.renderer
+            .find_drawable_index_by_mode(RenderingMode::Crop)
+    }
+
+    /// True when `pos` is on the crop's outline rather than merely inside it.
+    fn crop_border_hit(&self, pos: Vec2D) -> bool {
+        self.crop_index()
+            .and_then(|index| self.renderer.get_drawable_bounds(index))
+            .is_some_and(|(tl, br)| {
+                crate::tools::hit_test_rectangle(
+                    pos,
+                    tl,
+                    br - tl,
+                    crate::tools::HIT_BORDER_TOLERANCE,
+                    false,
+                )
+            })
+    }
+
+    fn annotation_hit(&self, pos: Vec2D) -> bool {
+        let crop_index = self.crop_index();
+        self.renderer
+            .hit_test(pos)
+            .into_iter()
+            .any(|index| Some(index) != crop_index)
+    }
+
+    /// True when the pointer tool's current selection lies under `pos`, so the press is its to
+    /// handle rather than a reason to switch tools.
+    fn pointer_selection_hit(&self, pos: Vec2D) -> bool {
+        let Some(index) = self.pointer_tool.borrow().selected_index() else {
+            return false;
+        };
+        self.renderer
+            .get_drawable_clone(index)
+            .is_some_and(|drawable| drawable.hit_test(pos, crate::tools::HIT_BORDER_TOLERANCE))
+    }
+
+    /// Hits that count as "clicked on a drawable" when deciding to switch tools. The crop body
+    /// spans the whole selection, so only its outline counts; otherwise every click inside it
+    /// would look like a click on a drawable.
+    fn hit_test_annotations(&self, pos: Vec2D) -> Vec<usize> {
+        let crop_index = self.crop_index();
+        let crop_border_hit = self.crop_border_hit(pos);
+        self.renderer
+            .hit_test(pos)
+            .into_iter()
+            .filter(|index| Some(*index) != crop_index || crop_border_hit)
+            .collect()
+    }
+
     fn handle_pointer_tool_click(
         &mut self,
         me: &MouseEventMsg,
@@ -1372,7 +1424,8 @@ impl SketchBoard {
                 && me.n_pressed == 1
                 && let Some(previous_tool) = self.temporary_pointer_previous_tool
                 && previous_tool != Tools::Pointer
-                && self.renderer.hit_test(me.pos).is_empty()
+                && self.hit_test_annotations(me.pos).is_empty()
+                && !self.pointer_selection_hit(me.pos)
                 && self
                     .pointer_tool
                     .borrow()
@@ -1416,7 +1469,7 @@ impl SketchBoard {
             }
         } else if me.type_ == MouseEventType::Click && me.n_pressed == 1 {
             if !me.modifier.contains(ModifierType::CONTROL_MASK)
-                && !self.renderer.hit_test(me.pos).is_empty()
+                && !self.hit_test_annotations(me.pos).is_empty()
             {
                 // temporarily switch to pointer tool
                 let previous_tool = self.active_tool_type();
@@ -1471,8 +1524,12 @@ impl SketchBoard {
 
         let is_alt_click = me.modifier.contains(ModifierType::ALT_MASK);
         let selected_idx = self.pointer_tool.borrow().selected_index();
+        // the crop covers everything inside it, so it yields to an annotation under the pointer
+        let sticky_selection_wins = selected_idx
+            .is_some_and(|idx| Some(idx) != self.crop_index() || !self.annotation_hit(me.pos));
         // If a drawable is already selected and the click still hits it, use it
         if !is_alt_click
+            && sticky_selection_wins
             && let Some(selected_idx) = selected_idx
             && let Some(drawable) = self.renderer.get_drawable_clone(selected_idx)
             && drawable.hit_test(me.pos, crate::tools::HIT_BORDER_TOLERANCE)
@@ -1934,7 +1991,13 @@ impl SketchBoard {
     }
 
     fn update_mouse_cursor(&self, pos: Vec2D) {
-        if !self.renderer.hit_test(pos).is_empty() {
+        // the crop body is only grabbable with the pointer tool, so only offer the cursor there
+        let hit = if self.active_tool_type() == Tools::Pointer {
+            !self.renderer.hit_test(pos).is_empty()
+        } else {
+            !self.hit_test_annotations(pos).is_empty()
+        };
+        if hit {
             let cursor = self.pointer_tool.borrow().get_cursor("grab");
             self.renderer.set_cursor(cursor.as_ref());
         } else {

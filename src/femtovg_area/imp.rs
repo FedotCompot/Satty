@@ -416,12 +416,19 @@ impl FemtoVgAreaMut {
     // Hit-test all drawables and return all indices whose bounds contain `pos`, in order from topmost to bottommost.
     pub fn hit_test(&self, pos: Vec2D) -> Vec<usize> {
         let mut results = Vec::new();
+        // the crop covers the whole selection, so it must never outrank an annotation inside it
+        let mut crop_hits = Vec::new();
         let tolerance = crate::tools::HIT_BORDER_TOLERANCE / self.scale_factor;
         for (i, d) in self.drawables.iter().enumerate().rev() {
             if d.hit_test(pos, tolerance) {
-                results.push(i);
+                if d.get_rendering_mode() == RenderingMode::Crop {
+                    crop_hits.push(i);
+                } else {
+                    results.push(i);
+                }
             }
         }
+        results.append(&mut crop_hits);
         results
     }
 

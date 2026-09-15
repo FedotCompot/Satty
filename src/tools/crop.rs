@@ -157,7 +157,7 @@ impl Drawable for Crop {
     }
 
     fn hit_test(&self, pos: Vec2D, tolerance: f32) -> bool {
-        hit_test_rectangle(pos, self.top_left, self.size, tolerance, false)
+        hit_test_rectangle(pos, self.top_left, self.size, tolerance, true)
     }
 
     fn translate(&mut self, delta: Vec2D) {
