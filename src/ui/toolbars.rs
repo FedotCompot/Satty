@@ -117,6 +117,101 @@ fn update_hint(
     widget.set_tooltip_text(Some(&new_hint));
 }
 
+/// Color picker for fullscreen="all". `GtkColorChooserDialog` puts Select/Cancel in a header bar,
+/// which a layer-shell surface does not render, and wraps the chooser in a scrolled window whose
+/// scrollbar hides the alpha slider. A bare `GtkColorChooserWidget` sizes to its content instead.
+fn show_color_picker_overlay(
+    sender: ComponentSender<StyleToolbar>,
+    current_color: RGBA,
+    custom_colors: Vec<RGBA>,
+) {
+    use gtk4_layer_shell::{KeyboardMode, Layer, LayerShell};
+
+    let chooser = gtk::ColorChooserWidget::new();
+    chooser.set_use_alpha(true);
+    chooser.set_rgba(&current_color);
+    chooser.set_vexpand(true);
+    if !custom_colors.is_empty() {
+        chooser.add_palette(gtk::Orientation::Horizontal, 8, &custom_colors);
+    }
+
+    let cancel = gtk::Button::with_label("Cancel");
+    let select = gtk::Button::with_label("Select");
+    select.add_css_class("suggested-action");
+
+    let buttons = gtk::Box::builder()
+        .orientation(gtk::Orientation::Horizontal)
+        .spacing(8)
+        .halign(Align::End)
+        .margin_top(12)
+        .margin_bottom(8)
+        .margin_start(8)
+        .margin_end(8)
+        .build();
+    buttons.append(&cancel);
+    buttons.append(&select);
+
+    let content = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    content.set_margin_top(8);
+    content.set_margin_bottom(8);
+    content.set_margin_start(8);
+    content.set_margin_end(8);
+    content.append(&chooser);
+    content.append(&buttons);
+
+    let window = gtk::Window::builder()
+        .title("Choose Color")
+        .modal(true)
+        .child(&content)
+        .build();
+    window.init_layer_shell();
+    window.set_namespace(Some("satty"));
+    window.set_layer(Layer::Overlay);
+    window.set_keyboard_mode(KeyboardMode::Exclusive);
+
+    // hands back the keyboard focus the exclusive mode took, or every shortcut goes dead
+    let close = {
+        let window = window.clone();
+        let sender = sender.clone();
+        move || {
+            window.close();
+            sender.output_sender().emit(ToolbarEvent::FocusCanvas);
+        }
+    };
+    let confirm = {
+        let close = close.clone();
+        move |color: Color| {
+            sender.input(StyleToolbarInput::ColorDialogFinished(Some(color)));
+            close();
+        }
+    };
+
+    {
+        let confirm = confirm.clone();
+        let chooser = chooser.clone();
+        select.connect_clicked(move |_| confirm(Color::from_gdk(chooser.rgba())));
+    }
+    // double-clicking a swatch also confirms, matching the stock dialog
+    chooser.connect_color_activated(move |_, rgba| confirm(Color::from_gdk(*rgba)));
+    {
+        let close = close.clone();
+        cancel.connect_clicked(move |_| close());
+    }
+
+    let key = gtk::EventControllerKey::new();
+    key.connect_key_pressed(move |_, keyval, _, _| {
+        if keyval == Key::Escape {
+            close();
+            relm4::gtk::glib::Propagation::Stop
+        } else {
+            relm4::gtk::glib::Propagation::Proceed
+        }
+    });
+    window.add_controller(key);
+
+    window.present();
+}
+
 #[relm4::component(pub)]
 impl SimpleComponent for ToolsToolbar {
     type Init = ();
@@ -397,6 +492,21 @@ pub enum ColorButtons {
 impl StyleToolbar {
     fn show_color_dialog(&self, sender: ComponentSender<StyleToolbar>, root: Option<Window>) {
         let current_color: RGBA = self.custom_color.into();
+        let custom_colors = APP_CONFIG
+            .read()
+            .color_palette()
+            .custom()
+            .iter()
+            .copied()
+            .map(RGBA::from)
+            .collect::<Vec<_>>();
+
+        // a normal dialog toplevel opens behind the Overlay annotation surfaces, invisible
+        if crate::layershell_all_active() {
+            show_color_picker_overlay(sender, current_color, custom_colors);
+            return;
+        }
+
         relm4::spawn_local(async move {
             let mut builder = ColorChooserDialog::builder()
                 .modal(true)
@@ -411,15 +521,6 @@ impl StyleToolbar {
             // build dialog and configure further
             let dialog = builder.build();
             dialog.set_use_alpha(true);
-
-            let custom_colors = APP_CONFIG
-                .read()
-                .color_palette()
-                .custom()
-                .iter()
-                .copied()
-                .map(RGBA::from)
-                .collect::<Vec<_>>();
 
             if !custom_colors.is_empty() {
                 dialog.add_palette(
