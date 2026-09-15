@@ -80,6 +80,7 @@ pub enum StyleToolbarInput {
     SetRoundCaps(bool),
     SetSize(Size),
     SetAnnotationSizeFactor(f32),
+    ResetAnnotationSizeFactor,
     ShowColorDialog,
     ColorDialogFinished(Option<Color>),
     SetVisibility(bool),
@@ -675,6 +676,14 @@ impl Component for StyleToolbar {
                     },
                 },
             },
+            gtk::Button {
+                set_focusable: false,
+                set_hexpand: false,
+
+                set_icon_name: "arrow-counterclockwise-regular",
+                set_tooltip: "Reset Annotation Size Factor",
+                connect_clicked => StyleToolbarInput::ResetAnnotationSizeFactor,
+            },
             gtk::Separator {},
             gtk::Label {
                 set_focusable: false,
@@ -787,6 +796,11 @@ impl Component for StyleToolbar {
             }
             StyleToolbarInput::SetAnnotationSizeFactor(value) => {
                 self.size_spin_button.set_value(value as f64);
+            }
+            StyleToolbarInput::ResetAnnotationSizeFactor => {
+                // set_value emits value-changed, which already pushes the style out
+                self.size_spin_button
+                    .set_value(APP_CONFIG.read().annotation_size_factor() as f64);
             }
             StyleToolbarInput::SetVisibility(visible) => self.visible = visible,
             StyleToolbarInput::ToggleVisibility => {
